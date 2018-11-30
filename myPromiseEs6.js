@@ -17,6 +17,45 @@
  * 5、实例上的其他方法
  * 6、类上的方法（resolve,reject,all,race,defer）
  */
+
+/**
+ * 处理返回结果的核心函数
+ * @param promise2
+ * @param x
+ * @param resolve
+ * @param reject
+ * @returns {*}
+ */
+let resolvePromise = (promise2, x, resolve, reject) =>{
+    if (x === promise2) {
+        return reject(new TypeError('循环引用！'));
+    }
+    let called = false;
+    if ((x != null && typeof x === 'object') || typeof x === 'function') {
+        try{
+            let then = x.then;
+            if (typeof then === 'function') { //x是promise实例
+                then.call(x, (value) => {
+                    if(called) return;
+                    called = true;
+                    resolvePromise(promise2, value, resolve, reject)
+                }, (reason) => {
+                    if (called) return;
+                    called = true;
+                    reject(reason);
+                })
+            } else {
+                resolve(x);
+            }
+        }catch(e) {
+            if(called) return;
+            called = true;
+            reject(e);
+        }
+    } else {
+        resolve(x);
+    }
+};
 class Promise {
     constructor(executor) {
         let self = this;
@@ -26,7 +65,7 @@ class Promise {
         self.onFulfilledCallbacks = [];
         self.onRejectedCallbacks = [];
 
-        function resolve(value) {
+        let resolve = (value) => {
             if (self.status === 'pending') {
                 self.status = 'fulfilled';
                 self.value = value;
@@ -34,9 +73,9 @@ class Promise {
                     fn();
                 })
             }
-        }
+        };
 
-        function reject(reason) {
+        let  reject = (reason) => {
             if (self.status === 'pending') {
                 self.status = 'rejected';
                 self.reason = reason;
@@ -44,7 +83,7 @@ class Promise {
                     fn();
                 })
             }
-        }
+        };
 
         try {
             executor(resolve, reject);
@@ -142,12 +181,12 @@ class Promise {
         let arr = [];
         let i = 0;
         return new Promise((resolve, reject) => {
-            function processData(index, data) {
+            let processData = (index, data) => {
                 arr[index] = data;
                 if (++i === promises.length) {
                     resolve(arr);
                 }
-            }
+            };
             promises.forEach((promise, index) => {
                 if (typeof promise.then === 'function') {
                     promise.then((value) => {
@@ -182,35 +221,14 @@ class Promise {
         });
         return dfd;
     };
-}
-function resolvePromise(promise2, x, resolve, reject) {
-    if (x === promise2) {
-        return reject(new TypeError('循环引用！'));
-    }
-    let called = false;
-    if ((x != null && typeof x === 'object') || typeof x === 'function') {
-        try{
-            let then = x.then;
-            if (typeof then === 'function') { //x是promise实例
-                then.call(x, (value) => {
-                    if(called) return;
-                    called = true;
-                    resolvePromise(promise2, value, resolve, reject)
-                }, (reason) => {
-                    if (called) return;
-                    called = true;
-                    reject(reason);
-                })
-            } else {
-                resolve(x);
-            }
-        }catch(e) {
-            if(called) return;
-            called = true;
-            reject(e);
-        }
-    } else {
-        resolve(x);
-    }
+
+    static defer () {
+        let dfd = {};
+        dfd.promise = new Promise((resolve, reject) => {
+            dfd.resolve = resolve;
+            dfd.reject = reject;
+        });
+        return dfd;
+    };
 }
 module.exports = Promise;
