@@ -9,7 +9,7 @@ let readir = promisify(fs.readdir);
 let rmdir = promisify(fs.rmdir);
 let unlink = promisify(fs.unlink);
 
-let mkdir = require('./mkdir');
+// let mkdir = require('./mkdir');
 // mkdir('a/b/c/d.js');
 // mkdir('a/aa/bb.js');
 /**
@@ -97,17 +97,18 @@ function removeDirPromise(p) {
         function next(current) {
             if (typeof current === 'undefined') {
                 // 删除
-                arr = arr.map(cur => {
-                    return new Promise((resolve, reject) => {
-                        fs.rmdir(cur, function() {
-                            resolve(cur);
-                        })
+                let len = arr.length - 1;
+                function remove(curP) {
+                    fs.rmdir(curP, function() {
+                        len--;
+                        if (len < 0) {
+                            resolve();
+                            return;
+                        }
+                        remove(arr[len]);
                     })
-                });
-
-                Promise.all(arr).then((data) => {
-                    resolve();
-                })
+                }
+                remove(arr[len]);
             } else {
                 fs.stat(current, function(err, statObj) {
                     if (statObj.isDirectory()) {
@@ -120,6 +121,7 @@ function removeDirPromise(p) {
                     } else {
                         arr.splice(index, 1);index--;
                         fs.unlink(current, function(err){
+                            console.log('删除文件');
                             next(arr[index]);
                         })
                     }
